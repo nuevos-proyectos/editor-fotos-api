@@ -112,10 +112,8 @@ def editar_foto():
 
     # Fuentes
     try:
-        fuente_titulo = ImageFont.truetype(FONT_PATH, 16)
         fuente_texto = ImageFont.truetype(FONT_PATH, 12)
     except IOError:
-        fuente_titulo = ImageFont.load_default()
         fuente_texto = ImageFont.load_default()
 
     # Procesar el texto
@@ -139,12 +137,17 @@ def editar_foto():
             bbox = fuente_texto.getbbox(linea)
             alto_texto_total += (bbox[3] - bbox[1]) + 4
     
-    alto_logo = 0
+    # Redimensionar logo (más pequeño para que no ocupe mucho espacio)
     if logo:
-        logo.thumbnail((ancho_recuadro - padding*2, 80), Image.Resampling.LANCZOS)
-        alto_logo = logo.height + 10
+        logo.thumbnail((60, 60), Image.Resampling.LANCZOS)  # Tamaño máximo 60x60
+        alto_logo = logo.height
+        ancho_logo = logo.width
+    else:
+        alto_logo = 0
+        ancho_logo = 0
     
-    alto_recuadro = alto_texto_total + alto_logo + (padding * 2) + 10
+    # Ajustar altura del recuadro (el logo no afecta la altura porque va superpuesto)
+    alto_recuadro = alto_texto_total + (padding * 2) + 10
 
     # Posición - INFERIOR IZQUIERDA
     margen = 20
@@ -160,7 +163,22 @@ def editar_foto():
     # Dibujar recuadro
     dibujo.rectangle(((x1, y1), (x2, y2)), fill=(0, 0, 0, 200))
     
-    # Dibujar texto
+    # Dibujar el logo en la esquina SUPERIOR DERECHA del recuadro
+    if logo:
+        # Posición: dentro del recuadro, en la esquina superior derecha
+        logo_x = x2 - padding - ancho_logo
+        logo_y = y1 + padding
+        
+        # Pegar el logo
+        capa_recuadro.paste(logo, (logo_x, logo_y), logo)
+        
+        # Espacio reservado para el logo (mover el texto hacia la izquierda)
+        espacio_logo = ancho_logo + 10
+    else:
+        espacio_logo = 0
+    
+    # Dibujar texto (ajustado para no chocar con el logo)
+    ancho_texto_con_logo = ancho_texto_disponible - espacio_logo
     y_offset = y1 + padding
     
     for linea in lineas_ajustadas:
@@ -168,6 +186,25 @@ def editar_foto():
             y_offset += 8
             continue
         
+        # Si la línea es muy larga y hay logo, ajustarla
+        if espacio_logo > 0 and len(linea) > 0:
+            # Verificar si el texto se solapa con el logo
+            bbox_temp = fuente_texto.getbbox(linea)
+            ancho_linea = bbox_temp[2] - bbox_temp[0]
+            if ancho_linea > ancho_texto_con_logo:
+                # Re-ajustar la línea considerando el espacio del logo
+                linea_ajustada_logo = wrap_text(linea, fuente_texto, ancho_texto_con_logo)
+                if '\n' in linea_ajustada_logo:
+                    # Dibujar la primera línea
+                    lineas_logo = linea_ajustada_logo.split('\n')
+                    for sublinea in lineas_logo:
+                        if sublinea.strip():
+                            dibujo.text((x1 + padding, y_offset), sublinea, font=fuente_texto, fill=(255, 255, 255, 255))
+                            bbox = fuente_texto.getbbox(sublinea)
+                            y_offset += (bbox[3] - bbox[1]) + 4
+                    continue
+        
+        # Colores especiales
         if linea.startswith('BOX:') or linea.startswith('Implementador:'):
             dibujo.text((x1 + padding, y_offset), linea, font=fuente_texto, fill=(255, 255, 100, 255))
         else:
@@ -175,12 +212,6 @@ def editar_foto():
         
         bbox = fuente_texto.getbbox(linea)
         y_offset += (bbox[3] - bbox[1]) + 4
-    
-    # Dibujar logo
-    if logo:
-        logo_x = x1 + padding
-        logo_y = y2 - padding - logo.height
-        capa_recuadro.paste(logo, (logo_x, logo_y), logo)
 
     # Combinar imágenes
     imagen_final = Image.alpha_composite(img, capa_recuadro).convert("RGB")
