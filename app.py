@@ -61,9 +61,9 @@ def editar_foto():
     
     alto_recuadro = alto_texto + (padding * 2)
 
-    # Posición
+    # Posición - INFERIOR IZQUIERDA
     margen_pantalla = 40
-    x1 = int((ancho - ancho_recuadro) / 2) # Centrado horizontal
+    x1 = margen_pantalla  # <--- Cambiado: fijo a la izquierda
     y1 = alto - alto_recuadro - margen_pantalla
     x2 = x1 + ancho_recuadro
     y2 = alto - margen_pantalla
