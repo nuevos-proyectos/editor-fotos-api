@@ -4,13 +4,31 @@ from flask import Flask, request, send_file
 from PIL import Image, ImageDraw, ImageFont
 import io
 import json
+import requests
+from io import BytesIO
 
 app = Flask(__name__)
 
 FONT_URL = "https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Regular.ttf"
 FONT_PATH = "Roboto-Regular.ttf"
+LOGO_URL = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhLvoXGdAuh0fCc7ijQ1dLoXj5JfSGsfg9121JALww3V_cZAi1S3bi2AlOfRi4OaL4QgA0Tg-L3vILiU2arsbL114YCYBSQxJdMQq-7mEmg2_NFdkkltiFPFP2WVn4v433B8Nqkt7FCA_o4X27GLmMNkEs2AqWanPc_4gZMAPOjE7FgI42yt3pjE6C24Io/s202/Picsart_26-01-01_23-01-18-178.png"
+
 if not os.path.exists(FONT_PATH):
     urllib.request.urlretrieve(FONT_URL, FONT_PATH)
+
+def descargar_logo():
+    """Descarga el logo desde la URL"""
+    try:
+        response = requests.get(LOGO_URL, timeout=10)
+        if response.status_code == 200:
+            logo = Image.open(BytesIO(response.content))
+            # Convertir a RGBA si es necesario
+            if logo.mode != 'RGBA':
+                logo = logo.convert('RGBA')
+            return logo
+    except Exception as e:
+        print(f"Error descargando logo: {e}")
+    return None
 
 def wrap_text(text, font, max_width):
     """Divide el texto en líneas para que quepan en el ancho definido."""
@@ -90,50 +108,47 @@ def editar_foto():
     print(f"Texto formateado:\n{texto_formateado}")
 
     # --- CONFIGURACIÓN DEL RECUADRO - ANCHO 25% ---
-    ancho_recuadro = int(ancho * 0.25)  # 25% del ancho de la imagen
-    padding = 15  # Padding más pequeño porque el recuadro es angosto
+    ancho_recuadro = int(ancho * 0.28)  # 28% para dar espacio al logo
+    padding = 15
     ancho_texto_disponible = ancho_recuadro - (padding * 2)
 
-    # Fuentes más pequeñas para que quepan en el recuadro angosto
+    # Fuentes
     try:
-        fuente_titulo = ImageFont.truetype(FONT_PATH, 18)
-        fuente_texto = ImageFont.truetype(FONT_PATH, 14)
+        fuente_titulo = ImageFont.truetype(FONT_PATH, 16)
+        fuente_texto = ImageFont.truetype(FONT_PATH, 12)
     except IOError:
         fuente_titulo = ImageFont.load_default()
         fuente_texto = ImageFont.load_default()
 
-    # Ajustar el texto al ancho del recuadro
+    # Procesar el texto línea por línea
     lineas_originales = texto_formateado.split('\n')
     lineas_ajustadas = []
     
     for linea in lineas_originales:
-        if linea.startswith('Latitud:') or linea.startswith('Longitud:') or linea.startswith('Nota:'):
-            # Usar fuente más pequeña para estos campos
-            linea_ajustada = wrap_text(linea, fuente_texto, ancho_texto_disponible)
-        else:
-            linea_ajustada = wrap_text(linea, fuente_texto, ancho_texto_disponible)
-        
+        linea_ajustada = wrap_text(linea, fuente_texto, ancho_texto_disponible)
         if '\n' in linea_ajustada:
             lineas_ajustadas.extend(linea_ajustada.split('\n'))
         else:
             lineas_ajustadas.append(linea_ajustada)
     
-    texto_final = '\n'.join(lineas_ajustadas)
+    # Descargar logo
+    logo = descargar_logo()
     
-    # Calcular altura necesaria
-    lineas_finales = texto_final.split('\n')
-    alto_total_texto = 0
+    # Calcular altura del recuadro
+    alto_texto_total = 0
+    for i, linea in enumerate(lineas_ajustadas):
+        if linea.strip():
+            bbox = fuente_texto.getbbox(linea)
+            alto_texto_total += (bbox[3] - bbox[1]) + 4
     
-    for i, linea in enumerate(lineas_finales):
-        if i == 0:
-            bbox = fuente_titulo.getbbox(linea)
-            alto_total_texto += (bbox[3] - bbox[1]) + 5
-        else:
-            if linea.strip():
-                bbox = fuente_texto.getbbox(linea)
-                alto_total_texto += (bbox[3] - bbox[1]) + 4
+    # Altura del logo (si existe)
+    alto_logo = 0
+    if logo:
+        # Redimensionar logo manteniendo proporción
+        logo.thumbnail((ancho_recuadro - padding*2, 80), Image.Resampling.LANCZOS)
+        alto_logo = logo.height + 10
     
-    alto_recuadro = alto_total_texto + (padding * 2)
+    alto_recuadro = alto_texto_total + alto_logo + (padding * 2) + 10
 
     # Posición - INFERIOR IZQUIERDA
     margen = 20
@@ -149,24 +164,35 @@ def editar_foto():
     # Dibujar recuadro semitransparente
     dibujo.rectangle(((x1, y1), (x2, y2)), fill=(0, 0, 0, 200))
     
-    # Dibujar el texto línea por línea
+    # Dibujar el texto
     y_offset = y1 + padding
     
-    for i, linea in enumerate(lineas_finales):
+    for linea in lineas_ajustadas:
         if not linea.strip():
-            y_offset += 10
+            y_offset += 8
             continue
-            
-        if i == 0:
-            # Primera línea (título) en amarillo
-            dibujo.text((x1 + padding, y_offset), linea, font=fuente_titulo, fill=(255, 255, 100, 255))
-            bbox = fuente_titulo.getbbox(linea)
-            y_offset += (bbox[3] - bbox[1]) + 8
+        
+        # Resaltar ciertas palabras
+        if linea.startswith('BOX:') or linea.startswith('Implementador:'):
+            # Texto en amarillo para títulos
+            dibujo.text((x1 + padding, y_offset), linea, font=fuente_texto, fill=(255, 255, 100, 255))
         else:
-            # Resto de líneas en blanco
             dibujo.text((x1 + padding, y_offset), linea, font=fuente_texto, fill=(255, 255, 255, 255))
-            bbox = fuente_texto.getbbox(linea)
-            y_offset += (bbox[3] - bbox[1]) + 5
+        
+        bbox = fuente_texto.getbbox(linea)
+        y_offset += (bbox[3] - bbox[1]) + 4
+    
+    # Dibujar el logo abajo del texto
+    if logo and alto_logo > 0:
+        # Posición centrada horizontalmente o a la izquierda
+        logo_x = x1 + padding
+        logo_y = y2 - padding - logo.height
+        
+        # Pegar el logo en la capa del recuadro
+        capa_recuadro.paste(logo, (logo_x, logo_y), logo)
+        
+        # Opcional: dibujar un borde alrededor del logo
+        # dibujo.rectangle(((logo_x-2, logo_y-2), (logo_x+logo.width+2, logo_y+logo.height+2)), outline=(255,255,255,100), width=1)
 
     # Combinar imágenes
     imagen_final = Image.alpha_composite(img, capa_recuadro).convert("RGB")
