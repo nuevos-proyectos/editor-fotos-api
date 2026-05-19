@@ -4,7 +4,6 @@ from flask import Flask, request, send_file
 from PIL import Image, ImageDraw, ImageFont
 import io
 import json
-import requests
 from io import BytesIO
 
 app = Flask(__name__)
@@ -17,18 +16,17 @@ if not os.path.exists(FONT_PATH):
     urllib.request.urlretrieve(FONT_URL, FONT_PATH)
 
 def descargar_logo():
-    """Descarga el logo desde la URL"""
+    """Descarga el logo desde la URL usando urllib"""
     try:
-        response = requests.get(LOGO_URL, timeout=10)
-        if response.status_code == 200:
-            logo = Image.open(BytesIO(response.content))
-            # Convertir a RGBA si es necesario
+        with urllib.request.urlopen(LOGO_URL, timeout=10) as response:
+            logo_data = response.read()
+            logo = Image.open(BytesIO(logo_data))
             if logo.mode != 'RGBA':
                 logo = logo.convert('RGBA')
             return logo
     except Exception as e:
         print(f"Error descargando logo: {e}")
-    return None
+        return None
 
 def wrap_text(text, font, max_width):
     """Divide el texto en líneas para que quepan en el ancho definido."""
@@ -107,8 +105,8 @@ def editar_foto():
     
     print(f"Texto formateado:\n{texto_formateado}")
 
-    # --- CONFIGURACIÓN DEL RECUADRO - ANCHO 25% ---
-    ancho_recuadro = int(ancho * 0.28)  # 28% para dar espacio al logo
+    # --- CONFIGURACIÓN DEL RECUADRO - ANCHO 28% ---
+    ancho_recuadro = int(ancho * 0.28)
     padding = 15
     ancho_texto_disponible = ancho_recuadro - (padding * 2)
 
@@ -120,7 +118,7 @@ def editar_foto():
         fuente_titulo = ImageFont.load_default()
         fuente_texto = ImageFont.load_default()
 
-    # Procesar el texto línea por línea
+    # Procesar el texto
     lineas_originales = texto_formateado.split('\n')
     lineas_ajustadas = []
     
@@ -134,17 +132,15 @@ def editar_foto():
     # Descargar logo
     logo = descargar_logo()
     
-    # Calcular altura del recuadro
+    # Calcular alturas
     alto_texto_total = 0
-    for i, linea in enumerate(lineas_ajustadas):
+    for linea in lineas_ajustadas:
         if linea.strip():
             bbox = fuente_texto.getbbox(linea)
             alto_texto_total += (bbox[3] - bbox[1]) + 4
     
-    # Altura del logo (si existe)
     alto_logo = 0
     if logo:
-        # Redimensionar logo manteniendo proporción
         logo.thumbnail((ancho_recuadro - padding*2, 80), Image.Resampling.LANCZOS)
         alto_logo = logo.height + 10
     
@@ -161,10 +157,10 @@ def editar_foto():
     capa_recuadro = Image.new('RGBA', img.size, (255, 255, 255, 0))
     dibujo = ImageDraw.Draw(capa_recuadro)
     
-    # Dibujar recuadro semitransparente
+    # Dibujar recuadro
     dibujo.rectangle(((x1, y1), (x2, y2)), fill=(0, 0, 0, 200))
     
-    # Dibujar el texto
+    # Dibujar texto
     y_offset = y1 + padding
     
     for linea in lineas_ajustadas:
@@ -172,9 +168,7 @@ def editar_foto():
             y_offset += 8
             continue
         
-        # Resaltar ciertas palabras
         if linea.startswith('BOX:') or linea.startswith('Implementador:'):
-            # Texto en amarillo para títulos
             dibujo.text((x1 + padding, y_offset), linea, font=fuente_texto, fill=(255, 255, 100, 255))
         else:
             dibujo.text((x1 + padding, y_offset), linea, font=fuente_texto, fill=(255, 255, 255, 255))
@@ -182,22 +176,16 @@ def editar_foto():
         bbox = fuente_texto.getbbox(linea)
         y_offset += (bbox[3] - bbox[1]) + 4
     
-    # Dibujar el logo abajo del texto
-    if logo and alto_logo > 0:
-        # Posición centrada horizontalmente o a la izquierda
+    # Dibujar logo
+    if logo:
         logo_x = x1 + padding
         logo_y = y2 - padding - logo.height
-        
-        # Pegar el logo en la capa del recuadro
         capa_recuadro.paste(logo, (logo_x, logo_y), logo)
-        
-        # Opcional: dibujar un borde alrededor del logo
-        # dibujo.rectangle(((logo_x-2, logo_y-2), (logo_x+logo.width+2, logo_y+logo.height+2)), outline=(255,255,255,100), width=1)
 
     # Combinar imágenes
     imagen_final = Image.alpha_composite(img, capa_recuadro).convert("RGB")
 
-    # Guardar en memoria
+    # Guardar resultado
     img_io = io.BytesIO()
     imagen_final.save(img_io, 'JPEG', quality=90)
     img_io.seek(0)
@@ -206,7 +194,7 @@ def editar_foto():
 
 @app.route('/')
 def index():
-    return "API de edición de fotos - Usa POST a /editar con campo 'foto' y 'texto'"
+    return "API de edición de fotos - Usa POST a /editar"
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
