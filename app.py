@@ -6,7 +6,7 @@ import io
 
 app = Flask(__name__)
 
-# MAGIA 1: Descargar una fuente profesional (Roboto) si el servidor no la tiene
+# Descargar fuente Roboto
 FONT_URL = "https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Regular.ttf"
 FONT_PATH = "Roboto-Regular.ttf"
 if not os.path.exists(FONT_PATH):
@@ -26,26 +26,34 @@ def editar_foto():
     capa_recuadro = Image.new('RGBA', img.size, (255,255,255,0))
     dibujo = ImageDraw.Draw(capa_recuadro)
 
-    # MAGIA 2: Cargar la fuente grande (Tamaño 45)
     try:
         fuente = ImageFont.truetype(FONT_PATH, 45)
     except IOError:
         fuente = ImageFont.load_default()
 
-    # MAGIA 3: Hacer el recuadro más grande para que quepan las letras grandes
-    margen = 20
-    ancho_recuadro = 700  # Más ancho
-    alto_recuadro = 250   # Más alto
-    x1 = margen
-    y1 = alto - alto_recuadro - margen
+    # --- MAGIA DINÁMICA ---
+    # Calcular el tamaño exacto que ocupará el texto
+    bbox = dibujo.multiline_textbbox((0, 0), texto_datos, font=fuente)
+    ancho_texto = bbox[2] - bbox[0]
+    alto_texto = bbox[3] - bbox[1]
+
+    margen_pantalla = 20
+    padding_interno = 30  # Espacio entre el texto y el borde del recuadro
+
+    # El tamaño del recuadro ahora se adapta al texto automáticamente
+    ancho_recuadro = ancho_texto + (padding_interno * 2)
+    alto_recuadro = alto_texto + (padding_interno * 2)
+
+    x1 = margen_pantalla
+    y1 = alto - alto_recuadro - margen_pantalla
     x2 = x1 + ancho_recuadro
-    y2 = alto - margen
+    y2 = alto - margen_pantalla
 
     # Dibujar fondo blanco semitransparente
     dibujo.rectangle(((x1, y1), (x2, y2)), fill=(255, 255, 255, 180))
 
-    # Escribir usando la fuente nueva
-    dibujo.text((x1 + 20, y1 + 20), texto_datos, font=fuente, fill=(0, 0, 0, 255))
+    # Escribir el texto respetando los márgenes internos
+    dibujo.text((x1 + padding_interno, y1 + padding_interno), texto_datos, font=fuente, fill=(0, 0, 0, 255))
 
     imagen_final = Image.alpha_composite(img, capa_recuadro).convert("RGB")
 
@@ -53,7 +61,6 @@ def editar_foto():
     imagen_final.save(img_io, 'JPEG', quality=85)
     img_io.seek(0)
 
-    # MAGIA 4: Obligar a n8n a reconocer que es una imagen JPG
     return send_file(
         img_io, 
         mimetype='image/jpeg',
