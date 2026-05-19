@@ -106,7 +106,7 @@ def editar_foto():
     print(f"Texto formateado:\n{texto_formateado}")
 
     # --- CONFIGURACIÓN DEL RECUADRO - ANCHO 28% ---
-    ancho_recuadro = int(ancho * 0.28)
+    ancho_recuadro = int(ancho * 0.21)
     padding = 15
     ancho_texto_disponible = ancho_recuadro - (padding * 2)
 
