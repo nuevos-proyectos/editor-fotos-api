@@ -216,7 +216,7 @@ def editar_foto():
     # Combinar imágenes
     imagen_final = Image.alpha_composite(img, capa_recuadro).convert("RGB")
 
-    # Guardar resultado
+    # Guardar resultado9
     img_io = io.BytesIO()
     imagen_final.save(img_io, 'JPEG', quality=90)
     img_io.seek(0)
