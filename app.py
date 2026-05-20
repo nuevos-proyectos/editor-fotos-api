@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 FONT_URL = "https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Regular.ttf"
 FONT_PATH = "Roboto-Regular.ttf"
-LOGO_URL = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhLvoXGdAuh0fCc7ijQ1dLoXj5JfSGsfg9121JALww3V_cZAi1S3bi2AlOfRi4OaL4QgA0Tg-L3vILiU2arsbL114YCYBSQxJdMQq-7mEmg2_NFdkkltiFPFP2WVn4v433B8Nqkt7FCA_o4X27GLmMNkEs2AqWanPc_4gZMAPOjE7FgI42yt3pjE6C24Io/s202/Picsart_26-01-01_23-01-18-178.png"
+LOGO_URL = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjjNul49kSok93iEbywwLCwLXFF0Gc3Tmnffeb7jvP3AJeAWC2w3KVtbZi_9-u9RUnAOvLKzN9y_e-5634GSDWh7WfMJP-Gib8mIrIbfkRr78Oc7K7kOOOtv43q-tLkJt4_7PeB6AQPUH0iWyHbH505C7K7JymJ4CKA4s65M1lMX3ONWLGE-tQbISKdg95b/s1919/Picsart_26-05-20_10-53-21-338.png"
 
 if not os.path.exists(FONT_PATH):
     urllib.request.urlretrieve(FONT_URL, FONT_PATH)
