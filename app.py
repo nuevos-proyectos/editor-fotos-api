@@ -96,7 +96,7 @@ def editar_foto():
     file = request.files['foto']
     texto_raw = request.form.get('texto', 'Sin datos')
 
-    # Abrir imagen
+    # Abrir imagenl
     img = Image.open(file.stream).convert("RGBA")
     ancho, alto = img.size
 
